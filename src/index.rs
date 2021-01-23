@@ -58,10 +58,7 @@ impl Index {
                         x => return Err(format!(
                             "unsupported field type: {}", x).into()),
                     },
-                    None => {
-                        println!("failed to identify county id");
-                        continue;
-                    },
+                    None => return Err("failed to identify county id".into()),
                 };
 
                 counties.insert(id, (point, polygon));
@@ -72,15 +69,8 @@ impl Index {
         let reader = netcdf::open(&self.gridfile)?;
 
         // read netcdf dimension values
-        let longitudes = match get_values::<f64>(&reader, "lon") {
-            Ok(longitudes) => longitudes,
-            Err(e) => panic!("failed to get variable values: {}", e),
-        };
-
-        let latitudes = match get_values::<f64>(&reader, "lat") {
-            Ok(latitudes) => latitudes,
-            Err(e) => panic!("failed to get variable values: {}", e),
-        };
+        let longitudes = get_values::<f64>(&reader, "lon")?;
+        let latitudes = get_values::<f64>(&reader, "lat")?;
 
         // label netcdf indices with corresponding county
         let latitude_delta = latitudes[1] - latitudes[0];
@@ -104,9 +94,8 @@ impl Index {
 
         let mut handles = Vec::new();
         for _ in 0..self.thread_count {
-            let buffer_size = self.buffer_size.clone();
-            let (counties, index_rx, latitudes, longitudes) = 
-                (counties.clone(), index_rx.clone(),
+            let (buffer_size, counties, index_rx, latitudes, longitudes) = 
+                (self.buffer_size.clone(), counties.clone(), index_rx.clone(),
                     latitudes.clone(), longitudes.clone());
 
             let handle = std::thread::spawn(move || {
@@ -167,9 +156,7 @@ impl Index {
         // send indices down channel
         for i in 0..longitudes.len() {
             for j in 0..latitudes.len() {
-                if let Err(e) = index_tx.send((i, j)) {
-                    panic!("failed to send index: {}", e);
-                }
+                index_tx.send((i, j))?;
             }
         }
 
@@ -177,7 +164,7 @@ impl Index {
         drop(index_tx);
         for handle in handles {
             if let Err(e) = handle.join() {
-                panic!("failed to join handle: {:?}", e);
+                return Err(format!("failed to join handle: {:?}", e).into());
             }
         }
 
