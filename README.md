@@ -1,4 +1,4 @@
-# cadre
+# sift
 ## overview
 Partition netCDF files by US counties.
 
