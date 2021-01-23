@@ -1,0 +1,17 @@
+[package]
+name = "sift"
+version = "0.1.0"
+authors = ["Daniel Rammer <hamersaw@protonmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossbeam-channel = "0.5"
+dbase = "0.0"
+geo = "0.16"
+geo-types = "0.6.2"
+ndarray = "0.13.0"
+netcdf = "0.6"
+shapefile = { version = "0.2", features = ["geo-types"]}
+structopt = "0.3"
