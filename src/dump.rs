@@ -23,8 +23,8 @@ pub struct Dump {
 
 impl Dump {
     pub fn execute(&self) -> Result<(), Box<dyn Error>> {
-        // read county indices from file
-        let mut counties = BTreeMap::new();
+        // read shape indices from file
+        let mut shapes = BTreeMap::new();
 
         {
             // open index file
@@ -39,15 +39,15 @@ impl Dump {
                 let x = fields[0].parse::<usize>()?;
                 let y = fields[1].parse::<usize>()?;
 
-                // add index to counties map
-                let indices = counties.entry(fields[2].to_string())
+                // add index to shapes map
+                let indices = shapes.entry(fields[2].to_string())
                     .or_insert(Vec::new());
                 indices.push((x, y));
             }
         }
 
-        let counties: Vec<(String, Vec<(usize, usize)>)> =
-            counties.into_iter().collect();
+        let shapes: Vec<(String, Vec<(usize, usize)>)> =
+            shapes.into_iter().collect();
 
         // parse times
         let times = {
@@ -109,8 +109,8 @@ impl Dump {
             }
         }
 
-        let (counties, fill_values, ndarrays) =
-            (Arc::new(counties), Arc::new(fill_values), Arc::new(ndarrays));
+        let (fill_values, ndarrays, shapes) =
+            (Arc::new(fill_values), Arc::new(ndarrays), Arc::new(shapes));
 
         // initailize thread channels
         let (index_tx, index_rx): (Sender<(usize, usize)>,
@@ -122,16 +122,16 @@ impl Dump {
         // initialize worker threads
         let mut worker_handles = Vec::new();
         for _ in 0..self.thread_count {
-            let (counties, data_tx, fill_values, index_rx, ndarrays) =
-                (counties.clone(), data_tx.clone(), fill_values.clone(),
-                    index_rx.clone(), ndarrays.clone());
+            let (data_tx, fill_values, index_rx, ndarrays, shapes) =
+                (data_tx.clone(), fill_values.clone(), index_rx.clone(),
+                    ndarrays.clone(), shapes.clone());
 
             let handle = std::thread::spawn(move || {
-                // compute feature values for each <time, county> pair
+                // compute feature values for each <time, shape> pair
                 for (i, j) in index_rx.iter() {
                     let mut data = Vec::new();
 
-                    let (_, indices) = &counties[j];
+                    let (_, indices) = &shapes[j];
                     for k in 0..ndarrays.len() {
                         let ndarray = &ndarrays[k];
                         let fill_value = fill_values[k];
@@ -167,7 +167,7 @@ impl Dump {
  
         // initialize print threads
         let handle = {
-            let (counties, times) = (counties.clone(), times.clone());  
+            let (shapes, times) = (shapes.clone(), times.clone());  
             std::thread::spawn(move || {
                 print!("time,shapeid");
                 for feature in features {
@@ -176,7 +176,7 @@ impl Dump {
                 println!("");
 
                 for (i, j, data) in data_rx.iter() {
-                    print!("{},{}", times[i], counties[j].0);
+                    print!("{},{}", times[i], shapes[j].0);
                     for k in 0..data.len() {
                         print!(",{:.2}", data[k]);
                     }
@@ -187,7 +187,7 @@ impl Dump {
 
         // send indices down channel
         for i in 0..times.len() {
-            for j in 0..counties.len() {
+            for j in 0..shapes.len() {
                 index_tx.send((i, j))?;
             }
         }

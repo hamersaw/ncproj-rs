@@ -30,21 +30,21 @@ pub struct Index {
 
 impl Index {
     pub fn execute(&self) -> Result<(), Box<dyn Error>> {
-        // populate counties map
-        let mut counties: BTreeMap<String, (Point<f64>, Polygon<f64>)> =
+        // populate shapes map
+        let mut shapes: BTreeMap<String, (Point<f64>, Polygon<f64>)> =
             BTreeMap::new();
 
         {
-            // open county shapefile reader and iterator
+            // open shapefile reader and iterator
             let reader = Reader::from_path(&self.shape_file)?;
             let iterator = reader.iter_shapes_and_records_as
                     ::<shapefile::Polygon>()?;
 
-            // iterate over county shapefile
+            // iterate over shapefile
             for result in iterator {
                 let (shape, record) = result?;
 
-                // parse county bounds and centroid
+                // parse shape bounds and centroid
                 let multipolygon: MultiPolygon<f64> = shape.into();
                 let polygon = multipolygon.into_iter().next().unwrap();
                 let point = polygon.centroid().unwrap();
@@ -56,10 +56,10 @@ impl Index {
                         x => return Err(format!(
                             "unsupported field type: {}", x).into()),
                     },
-                    None => return Err("failed to identify county id".into()),
+                    None => return Err("failed to identify shape id".into()),
                 };
 
-                counties.insert(id, (point, polygon));
+                shapes.insert(id, (point, polygon));
             }
         }
         
@@ -70,31 +70,31 @@ impl Index {
         let longitudes = crate::get_netcdf_values::<f64>(&reader, "lon")?;
         let latitudes = crate::get_netcdf_values::<f64>(&reader, "lat")?;
 
-        // label netcdf indices with corresponding county
+        // label netcdf indices with corresponding shape
         let latitude_delta = latitudes[1] - latitudes[0];
         let longitude_delta = longitudes[1] - longitudes[0];
 
-        let mut county_index = Vec::new();
+        let mut shape_index = Vec::new();
         for _ in 0..longitudes.len() {
             let mut vec = Vec::new();
             for _ in 0..latitudes.len() {
                 vec.push("".to_string());
             }
 
-            county_index.push(vec);
+            shape_index.push(vec);
         }
 
         let (index_tx, index_rx):
             (Sender<(usize, usize)>, Receiver<(usize, usize)>) =
                 crossbeam_channel::unbounded();
-        let (counties, latitudes, longitudes) = 
-            (Arc::new(counties), Arc::new(latitudes), Arc::new(longitudes));
+        let (latitudes, longitudes, shapes) = 
+            (Arc::new(latitudes), Arc::new(longitudes), Arc::new(shapes));
 
         let mut handles = Vec::new();
         for _ in 0..self.thread_count {
-            let (buffer_size, counties, index_rx, latitudes, longitudes) = 
-                (self.buffer_size.clone(), counties.clone(), index_rx.clone(),
-                    latitudes.clone(), longitudes.clone());
+            let (buffer_size, index_rx, latitudes, longitudes, shapes) =
+                (self.buffer_size.clone(), index_rx.clone(),
+                    latitudes.clone(), longitudes.clone(), shapes.clone());
 
             let handle = std::thread::spawn(move || {
                 let mut buffer: Vec<(f64, &str, &Polygon<f64>)> = Vec::new();
@@ -113,8 +113,8 @@ impl Index {
                         vec![]);
                     let index_point = index_polygon.centroid().unwrap();
 
-                    // identify closest counties by centroid
-                    for (k, (point, polygon)) in counties.iter() {
+                    // identify closest shape by centroid
+                    for (k, (point, polygon)) in shapes.iter() {
                         // compute distance
                         let distance = 
                             point.euclidean_distance(&index_point);
