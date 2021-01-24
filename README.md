@@ -8,9 +8,9 @@ TODO
 ## results
     hamersaw@nightcrawler:~/development/sift$ time ./target/debug/sift dump ~/downloads/county-index.txt ~/downloads/uwin-data/macav2metdata_*nc > data.csv
 
-    real	13m32.674s
-    user	13m30.336s
-    sys	0m2.321s
+    real	3m9.753s
+    user	22m57.940s
+    sys	0m9.584s
 
 ## todo
 - add help messages to all structopt definitions
