@@ -5,8 +5,6 @@ use geo::algorithm::contains::Contains;
 use geo::algorithm::euclidean_distance::EuclideanDistance;
 use geo::algorithm::intersects::Intersects;
 use geo_types::{LineString, MultiPolygon, Point, Polygon};
-use ndarray::ArrayD;
-use netcdf::File;
 use shapefile::Reader;
 use structopt::StructOpt;
 
@@ -21,10 +19,10 @@ pub struct Index {
     buffer_size: usize,
 
     #[structopt(parse(from_os_str), index = 2)]
-    gridfile: PathBuf,
+    grid_file: PathBuf,
 
     #[structopt(parse(from_os_str), index = 1)]
-    shapefile: PathBuf,
+    shape_file: PathBuf,
 
     #[structopt(short = "t", long = "thread-count", default_value = "8")]
     thread_count: u8,
@@ -38,7 +36,7 @@ impl Index {
 
         {
             // open county shapefile reader and iterator
-            let reader = Reader::from_path(&self.shapefile)?;
+            let reader = Reader::from_path(&self.shape_file)?;
             let iterator = reader.iter_shapes_and_records_as
                     ::<shapefile::Polygon>()?;
 
@@ -65,12 +63,12 @@ impl Index {
             }
         }
         
-        // open netcdf gridfile
-        let reader = netcdf::open(&self.gridfile)?;
+        // open netcdf grid_file
+        let reader = netcdf::open(&self.grid_file)?;
 
         // read netcdf dimension values
-        let longitudes = get_values::<f64>(&reader, "lon")?;
-        let latitudes = get_values::<f64>(&reader, "lat")?;
+        let longitudes = crate::get_netcdf_values::<f64>(&reader, "lon")?;
+        let latitudes = crate::get_netcdf_values::<f64>(&reader, "lat")?;
 
         // label netcdf indices with corresponding county
         let latitude_delta = latitudes[1] - latitudes[0];
@@ -170,14 +168,4 @@ impl Index {
 
         Ok(())
     }
-}
-
-fn get_values<T: netcdf::Numeric>(reader: &File, name: &str) 
-        -> Result<ArrayD<T>, netcdf::error::Error> {
-    let variable = match reader.variable(name) {
-        Some(variable) => variable,
-        None => return Err(format!("variable {} not found", name).into()),
-    };
-
-    variable.values::<T>(None, None)
 }
