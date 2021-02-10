@@ -8,7 +8,7 @@ use geo_types::{LineString, MultiPolygon, Point, Polygon};
 use shapefile::Reader;
 use structopt::StructOpt;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -50,16 +50,11 @@ impl Index {
                 let point = polygon.centroid().unwrap();
 
                 // parse record metadata
-                let id = match record.get("GEOID10") {
-                    Some(value) => match value {
-                        FieldValue::Character(Some(id)) => id.to_string(),
-                        x => return Err(format!(
-                            "unsupported field type: {}", x).into()),
-                    },
-                    None => return Err("failed to identify shape id".into()),
-                };
+                let statefp = parse_field(&record, "STATEFP10")?;
+                let countyfp = parse_field(&record, "COUNTYFP10")?;
 
-                shapes.insert(id, (point, polygon));
+                shapes.insert(format!("G{}0{}0", statefp, countyfp),
+                    (point, polygon));
             }
         }
         
@@ -167,5 +162,15 @@ impl Index {
         }
 
         Ok(())
+    }
+}
+
+fn parse_field(record: &HashMap<String, FieldValue>, name: &str) -> Result<String, Box<dyn Error>> {
+    match record.get(name) {
+        Some(value) => match value {
+            FieldValue::Character(Some(id)) => Ok(id.to_string()),
+            x => Err(format!("unsupported field type: {}", x).into()),
+        },
+        None => Err("failed to identify shape id".into()),
     }
 }
