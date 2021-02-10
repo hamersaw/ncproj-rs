@@ -1,3 +1,5 @@
+use chrono::Duration;
+use chrono::prelude::{TimeZone, Utc};
 use crossbeam_channel::{Receiver, Sender};
 use netcdf::attribute::AttrValue;
 use structopt::StructOpt;
@@ -50,9 +52,14 @@ impl Dump {
             shapes.into_iter().collect();
 
         // parse times
-        let times = {
+        let times: Vec<i64> = {
             let reader = netcdf::open(&self.data_files[0])?;
-            crate::get_netcdf_values::<f32>(&reader, "time")?
+            let times = crate::get_netcdf_values::<i64>(&reader, "time")?;
+
+            let datetime = Utc.ymd(1900, 1, 1).and_hms(0, 0, 0);
+            times.iter().map(
+                    |x| (datetime + Duration::days(*x)).timestamp()
+                ).collect()
         };
 
         // parse data
