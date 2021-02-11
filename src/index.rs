@@ -108,7 +108,7 @@ impl Index {
                         vec![]);
                     let index_point = index_polygon.centroid().unwrap();
 
-                    // identify closest shape by centroid
+                    // identify closest shapes by centroid
                     for (k, (point, polygon)) in shapes.iter() {
                         // compute distance
                         let distance = 
